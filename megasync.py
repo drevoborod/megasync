@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os, sys, configparser, datetime, subprocess
+import os, sys, configparser, datetime, subprocess, shutil
 
 class MegasyncErrors(Exception): pass
 
@@ -124,10 +124,10 @@ class FileOpers(Megaquery):
         olddir = self.prefix + "_old"
         if self.prefix in os.listdir("."):
             try:
-                os.rmdir(olddir)
+                shutil.rmtree(olddir, ignore_errors=True)
+                os.rename(self.prefix, olddir)
             except:
-                pass
-            os.rename(self.prefix, olddir)
+                raise MegasyncErrors("Unable to rename directory.")
             try:
                 subprocess.check_output("7z x -p{0} {1}".format(self.archive_pass, filename), shell=True)
             except subprocess.CalledProcessError:
