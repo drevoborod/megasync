@@ -59,7 +59,7 @@ class Megaquery():
         """
         try:
             temp = subprocess.check_output("megals -u {0} -p {1} --names --reload /Root".format(self.user, self.user_pass), shell=True)
-            temp_files = [x for x in str(temp)[2:-1].split(r"\n")]
+            temp_files = str(temp, "utf-8").split()
             if self.prefix not in temp_files:
                 subprocess.check_output("megamkdir -u {0} -p {1} --reload /Root/{2}".format(self.user, self.user_pass, self.prefix), shell=True)
             megacall = subprocess.check_output("megals -u {0} -p {1} --names --reload /Root/{2}".format(self.user, self.user_pass, self.prefix), shell=True)
@@ -67,7 +67,7 @@ class Megaquery():
             raise MegasyncErrors("Unable to list MEGA files.")
         else:
             # Получаем из строки список файлов и сохраняем из него только те, которые подходят под шаблон:
-            files = [x for x in str(megacall)[2:-1].split(r"\n") if x.startswith(self.prefix) and x.endswith(".7z")]
+            files = [x for x in str(megacall, "utf-8").split() if x.startswith(self.prefix) and x.endswith(".7z")]
             return self.find_newest(files)
 
     def get(self, filename):
