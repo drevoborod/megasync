@@ -38,7 +38,7 @@ class Megaquery():
         # Получаем список времён создания из всех файлов, в которых время указано в подходящем под шаблон формате:
         for f in flist:
             try:
-                times.append((datetime.datetime.strptime(f[len(self.prefix):-(len(self.platform) + 4)], '%d_%m_%y_%H_%M_%S'), f[-(len(self.platform) + 4):-3]))
+                times.append((datetime.datetime.strptime(f[(len(self.prefix) + 1):-(len(self.platform) + 4)], '%d_%m_%y_%H_%M_%S'), f[-(len(self.platform) + 4):]))
             except ValueError:
                 pass
         # Сортируем этот список и возвращаем имя файла, соответствующее самому новому из них:
@@ -48,7 +48,7 @@ class Megaquery():
         # иначе возвращаем 0 и этот самый файл:
         else:
             times.sort()
-            return (0, self.prefix + "_" + times[-1][0].strftime('%d_%m_%y_%H_%M_%S') + "_" + times[-1][1])
+            return (0, self.prefix + "_" + times[-1][0].strftime('%d_%m_%y_%H_%M_%S') + times[-1][1])
 
 
     def find_newest_mega(self):
@@ -58,12 +58,11 @@ class Megaquery():
         :return:
         """
         try:
+            temp = subprocess.check_output("megals -u {0} -p {1} --names --reload /Root".format(self.user, self.user_pass), shell=True)
+            temp_files = [x for x in str(temp)[2:-1].split(r"\n")]
+            if self.prefix not in temp_files:
+                subprocess.check_output("megamkdir -u {0} -p {1} --reload /Root/{2}".format(self.user, self.user_pass, self.prefix), shell=True)
             megacall = subprocess.check_output("megals -u {0} -p {1} --names --reload /Root/{2}".format(self.user, self.user_pass, self.prefix), shell=True)
-            if len(megacall) == 0:
-                temp = subprocess.check_output("megals -u {0} -p {1} --names --reload /Root".format(self.user, self.user_pass), shell=True)
-                temp_files = [x for x in str(temp)[2:-1].split(r"\n")]
-                if self.prefix not in temp_files:
-                    subprocess.check_output("megamkdir -u {0} -p {1} --reload /Root/{2}".format(self.user, self.user_pass, self.prefix), shell=True)
         except subprocess.CalledProcessError:
             raise MegasyncErrors("Unable to list MEGA files.")
         else:
