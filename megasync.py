@@ -128,13 +128,10 @@ class FileOpers(Megaquery):
                 os.rename(self.prefix, olddir)
             except:
                 raise MegasyncErrors("Unable to rename directory.")
-            try:
-                subprocess.check_output("7z x -p{0} {1}".format(self.archive_pass, filename), shell=True)
-            except subprocess.CalledProcessError:
-                raise MegasyncErrors("Unable to extract archive.")
-        else:
-            raise MegasyncErrors("No data to compress!")
-
+        try:
+            subprocess.check_output("7z x -p{0} {1}".format(self.archive_pass, filename), shell=True)
+        except subprocess.CalledProcessError:
+            raise MegasyncErrors("Unable to extract archive.")
 
 
 def exitfunc(message, number):
