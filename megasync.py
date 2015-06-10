@@ -54,10 +54,16 @@ class Megaquery():
     def find_newest_mega(self):
         """
         Функция для получения из указанной директории Меги имени новейшего файла.
+        Кроме того, если отсутствует указанная директория, она её создаёт.
         :return:
         """
         try:
             megacall = subprocess.check_output("megals -u {0} -p {1} --names --reload /Root/{2}".format(self.user, self.user_pass, self.prefix), shell=True)
+            if len(megacall) == 0:
+                temp = subprocess.check_output("megals -u {0} -p {1} --names --reload /Root".format(self.user, self.user_pass), shell=True)
+                temp_files = [x for x in str(temp)[2:-1].split(r"\n")]
+                if self.prefix not in temp_files:
+                    subprocess.check_output("megamkdir -u {0} -p {1} --reload /Root/{2}".format(self.user, self.user_pass, self.prefix), shell=True)
         except subprocess.CalledProcessError:
             raise MegasyncErrors("Unable to list MEGA files.")
         else:
@@ -108,6 +114,8 @@ class FileOpers(Megaquery):
             subprocess.check_output("7z a -mhe=on -p{0} {1} {2}".format(self.archive_pass, filename, self.prefix), shell=True)
         except subprocess.CalledProcessError:
             raise MegasyncErrors("Unable to create archive.")
+        else:
+            return filename
 
     def unzip(self, filename):
         """
@@ -144,7 +152,7 @@ if __name__ == "__main__":
     # Запрашиваем у юзера пароль от Меги:
     mega_passwd = input("Enter MEGA password: ")
     # Инициализируем класс для работы с Мегой:
-    mega = FileOpers(conf.prefix, conf.username, mega_passwd, conf.platform_id, conf.password)
+    mega = FileOpers(conf.prefix, conf.username, mega_passwd, conf.password, conf.platform_id)
     try:
         # Ищем самый свежий файл из Меги. Получаем кортеж из признака успеха (0|1) и собственно файла, если он есть:
         megafile = mega.find_newest_mega()
@@ -152,52 +160,68 @@ if __name__ == "__main__":
         exitfunc(err, 1)
     # Ищем самый новый файл на компьютере. Получаем в виде кортежа из кода ошибки (0/1) и собственно файла:
     local_file = mega.find_newest_local()
-    try:
-        # Если на Меге не найдено ни одного подходящего файла:
-        if megafile[0] == 1:
-            # Если к тому же и локального файла нет:
-            if local_file[0] == 1:
-                # То ищем директорию, которую можно запаковать:
-                if conf.prefix in os.listdir("."):
+    # Если на Меге не найдено ни одного подходящего файла:
+    if megafile[0] == 1:
+        # Если к тому же и локального файла нет:
+        if local_file[0] == 1:
+            # То ищем директорию, которую можно запаковать:
+            if conf.prefix in os.listdir("."):
+                try:
                     # Запаковываем нужный локальный файл:
                     zipped = mega.zip()
                     # И шлём его на Мегу:
                     mega.send(zipped)
-                    exitfunc("File '%s' has been sent successfully." % zipped, 0)
+                except MegasyncErrors as err:
+                    exitfunc(err, 1)
                 else:
-                    # Если нет и директории, то просто выходим:
-                    exitfunc("No files to work with!", 1)
-            # Если локальный файл есть, то шлём его на Мегу:
+                    exitfunc("File '%s' has been sent successfully." % zipped, 0)
             else:
+                # Если нет и директории, то просто выходим:
+                exitfunc("No files to work with!", 1)
+        # Если локальный файл есть, то шлём его на Мегу:
+        else:
+            try:
                 mega.send(local_file[1])
+            except MegasyncErrors as err:
+                exitfunc(err, 1)
+            else:
                 exitfunc("File '%s' has been sent successfully." % local_file[1], 0)
-        # Есла на Меге найден подходящий файл, то:
-        elif megafile[0] == 0:
-            # Если локально подходящий под шаблон файл не найден:
-            if local_file[0] == 1:
+    # Есла на Меге найден подходящий файл, то:
+    elif megafile[0] == 0:
+        # Если локально подходящий под шаблон файл не найден:
+        if local_file[0] == 1:
+            try:
                 # То скачиваем его с Меги:
                 mega.get(megafile[1])
                 # И распаковываем:
                 mega.unzip(megafile[1])
-                exitfunc("File '%s' downloaded successfully." % megafile[1], 0)
-            # Если оба файла - и локальный, и на Меге - одинаковые, то просто выходим:
-            elif local_file[1] == megafile[1]:
-                exitfunc("Nothing to do.", 0)
-            # Если локально подходящий под шаблон файл найден, то нужно выяснить, старше он или моложе того, что на Меге:
+            except MegasyncErrors as err:
+                exitfunc(err, 1)
             else:
-                mega_file_age = datetime.datetime.strptime(megafile[1][len(conf.prefix):-(len(conf.platform_id) + 4)], '%d_%m_%y_%H_%M_%S')
-                local_file_age = datetime.datetime.strptime(local_file[1][len(conf.prefix):-(len(conf.platform_id) + 4)], '%d_%m_%y_%H_%M_%S')
-                # Если локальный старше:
-                if mega_file_age < local_file_age:
+                exitfunc("File '%s' downloaded successfully." % megafile[1], 0)
+        # Если оба файла - и локальный, и на Меге - одинаковые, то просто выходим:
+        elif local_file[1] == megafile[1]:
+            exitfunc("Nothing to do.", 0)
+        # Если локально подходящий под шаблон файл найден, то нужно выяснить, старше он или моложе того, что на Меге:
+        else:
+            mega_file_age = datetime.datetime.strptime(megafile[1][len(conf.prefix):-(len(conf.platform_id) + 4)], '%d_%m_%y_%H_%M_%S')
+            local_file_age = datetime.datetime.strptime(local_file[1][len(conf.prefix):-(len(conf.platform_id) + 4)], '%d_%m_%y_%H_%M_%S')
+            # Если локальный старше:
+            if mega_file_age < local_file_age:
+                try:
                     # То заливаем его на Мегу:
                     mega.send(local_file[1])
-                    exitfunc("File '%s' successfully uploaded." % local_file[1], 0)
-                # Если файл с Меги старше:
+                except MegasyncErrors as err:
+                    exitfunc(err, 1)
                 else:
+                    exitfunc("File '%s' successfully uploaded." % local_file[1], 0)
+            # Если файл с Меги старше:
+            else:
+                try:
                     # Скачиваем его и распаковываем локально:
                     mega.get(megafile[1])
                     mega.unzip(megafile[1])
+                except MegasyncErrors as err:
+                    exitfunc(err, 1)
+                else:
                     exitfunc("File '%s' downloaded successfully."% megafile[1], 0)
-    except MegasyncErrors as err:
-        exitfunc(err, 1)
-
