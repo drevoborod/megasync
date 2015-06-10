@@ -160,6 +160,16 @@ if __name__ == "__main__":
     # Ищем самый новый файл на компьютере. Получаем в виде кортежа из кода ошибки (0/1) и собственно файла:
     local_file = mega.find_newest_local()
     # Если на Меге не найдено ни одного подходящего файла:
+    try:
+        # Если указан ключ командной строки "p", то запаковать имеющуюся директорию и отправить на Мегу:
+        if sys.argv[1] == "p":
+            new_file = mega.zip()
+            mega.send(new_file)
+            exitfunc("File '%s' successfully uploaded." % new_file, 0)
+    except MegasyncErrors as err:
+        exitfunc(err, 1)
+    except IndexError:
+        pass
     if megafile[0] == 1:
         # Если к тому же и локального файла нет:
         if local_file[0] == 1:
