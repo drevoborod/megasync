@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os, sys, configparser, datetime, subprocess, shutil
+import os, sys, configparser, datetime, subprocess, shutil, stat
 
 class MegasyncErrors(Exception): pass
 
@@ -124,15 +124,26 @@ class FileOpers(Megaquery):
         olddir = self.prefix + "_old"
         if self.prefix in os.listdir("."):
             try:
-                shutil.rmtree(olddir, ignore_errors=True)
+                shutil.rmtree(olddir, ignore_errors=False, onerror=del_rw)
                 os.rename(self.prefix, olddir)
-            except:
+            except Exception as err:
                 raise MegasyncErrors("Unable to rename directory.")
         try:
             subprocess.check_output("7z x -p{0} {1}".format(self.archive_pass, filename), shell=True)
         except subprocess.CalledProcessError:
             raise MegasyncErrors("Unable to extract archive.")
 
+
+def del_rw(action, name, exc):
+    """
+    Функция для удаления файлов только для чтения под Windows.
+    :param action:
+    :param name:
+    :param exc:
+    :return:
+    """
+    os.chmod(name, stat.S_IWRITE)
+    os.remove(name)
 
 def exitfunc(message, number):
     print("\n%s\n" % message)
