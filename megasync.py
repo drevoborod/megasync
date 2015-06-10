@@ -203,8 +203,8 @@ if __name__ == "__main__":
             exitfunc("Nothing to do.", 0)
         # Если локально подходящий под шаблон файл найден, то нужно выяснить, старше он или моложе того, что на Меге:
         else:
-            mega_file_age = datetime.datetime.strptime(megafile[1][len(conf.prefix):-(len(conf.platform_id) + 4)], '%d_%m_%y_%H_%M_%S')
-            local_file_age = datetime.datetime.strptime(local_file[1][len(conf.prefix):-(len(conf.platform_id) + 4)], '%d_%m_%y_%H_%M_%S')
+            mega_file_age = datetime.datetime.strptime(megafile[1][(len(conf.prefix) + 1):-(len(conf.platform_id) + 4)], '%d_%m_%y_%H_%M_%S')
+            local_file_age = datetime.datetime.strptime(local_file[1][(len(conf.prefix) + 1):-(len(conf.platform_id) + 4)], '%d_%m_%y_%H_%M_%S')
             # Если локальный старше:
             if mega_file_age < local_file_age:
                 try:
