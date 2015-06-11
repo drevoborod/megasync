@@ -34,21 +34,25 @@ class Megaquery():
         :param flist:
         :return:
         """
-        # ToDo: Переделать функцию так, чтобы происходила сортировка только по времени, а не по кортежам (время, платформа).
-        times = []
         # Получаем список времён создания из всех файлов, в которых время указано в подходящем под шаблон формате:
-        for f in flist:
-            try:
-                times.append((datetime.datetime.strptime(f[(len(self.prefix) + 1):-(len(self.platform) + 4)], '%d_%m_%y_%H_%M_%S'), f[-(len(self.platform) + 4):]))
-            except ValueError:
-                pass
-        # Сортируем этот список и возвращаем имя файла, соответствующее самому новому из них:
+        try:
+            times = {datetime.datetime.strptime(f[(len(self.prefix) + 1):-(len(self.platform) + 4)], '%d_%m_%y_%H_%M_%S'): f[-(len(self.platform) + 4):] for f in flist}
+        except ValueError:
+            pass
+
+        #for f in flist:
+        #    try:
+        #        times.append((datetime.datetime.strptime(f[(len(self.prefix) + 1):-(len(self.platform) + 4)], '%d_%m_%y_%H_%M_%S'), f[-(len(self.platform) + 4):]))
+        #    except ValueError:
+        #        pass
+
         # Если ни одного подходящего файла не нашлось, т.е. длина списка нулевая, возвращаем единицу,
         if len(times) == 0:
             return (1,)
-        # иначе возвращаем 0 и этот самый файл:
+        # иначе возвращаем 0 и самый новый файл:
         else:
-            return (0, self.prefix + "_" + max(times)[0].strftime('%d_%m_%y_%H_%M_%S') + max(times)[1])
+            newest = max(times.keys())
+            return (0, self.prefix + "_" + newest.strftime('%d_%m_%y_%H_%M_%S') + times[newest])
 
 
     def find_newest_mega(self):
@@ -125,6 +129,9 @@ class FileOpers(Megaquery):
         if self.prefix in os.listdir("."):
             try:
                 shutil.rmtree(olddir, ignore_errors=False, onerror=del_rw)
+            except FileNotFoundError:
+                pass
+            try:
                 os.rename(self.prefix, olddir)
             except Exception as err:
                 raise MegasyncErrors("Unable to rename directory.")
