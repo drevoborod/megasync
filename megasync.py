@@ -47,8 +47,7 @@ class Megaquery():
             return (1,)
         # иначе возвращаем 0 и этот самый файл:
         else:
-            times.sort()
-            return (0, self.prefix + "_" + times[-1][0].strftime('%d_%m_%y_%H_%M_%S') + times[-1][1])
+            return (0, self.prefix + "_" + max(times)[0].strftime('%d_%m_%y_%H_%M_%S') + max(times)[1])
 
 
     def find_newest_mega(self):
@@ -137,10 +136,6 @@ class FileOpers(Megaquery):
 def del_rw(action, name, exc):
     """
     Функция для удаления файлов только для чтения под Windows.
-    :param action:
-    :param name:
-    :param exc:
-    :return:
     """
     os.chmod(name, stat.S_IWRITE)
     os.remove(name)
