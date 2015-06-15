@@ -36,7 +36,7 @@ class Megaquery():
         template = self.prefix + r"_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,2}_[a-zA-Z]*\.7z"
         reg = re.compile(template).match(filename)
         if reg is not None:
-            return reg.group()
+            return True
 
     def strip_tail(self, filename):
         """
@@ -96,7 +96,8 @@ class Megaquery():
             raise MegasyncErrors("Unable to list MEGA files.")
         else:
             # Получаем из строки список файлов и сохраняем из него только те, которые подходят под шаблон:
-            files = [x for x in str(megacall, "utf-8").split() if self.find_regular(x) is not None]
+            files = filter(self.find_regular, str(megacall, "utf-8").split())
+            #files = [x for x in str(megacall, "utf-8").split() if self.find_regular(x) is not None]
             return self.find_newest(files)
 
     def get(self, filename):
@@ -129,7 +130,8 @@ class FileOpers(Megaquery):
         Функция для получения самого свежего подходящего файла из локальных.
         :return:
         """
-        files = [x for x in os.listdir(".") if self.find_regular(x) is not None]
+        files = filter(self.find_regular, os.listdir("."))
+        #files = [x for x in os.listdir(".") if self.find_regular(x) is not None]
         return self.find_newest(files)
 
     def zip(self):
