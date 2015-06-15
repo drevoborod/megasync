@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os, sys, configparser, datetime, subprocess, shutil, stat
+import os, sys, configparser, datetime, subprocess, shutil, stat, re
 
 class MegasyncErrors(Exception): pass
 
@@ -27,6 +27,31 @@ class Megaquery():
         self.platform = platform_prefix     # Идентификатор платформы.
         self.archive_pass = archive_passwd  # Пароль, с которым будет создаваться (и распаковываться) архив.
 
+    def find_regular(self, filename):
+        """
+        Функция анализирует строку (по идее - название файла) на соотвествие с помощью регулярного выражения.
+        :param filename:
+        :return:
+        """
+        template = self.prefix + r"_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,2}_[a-zA-Z]*\.7z"
+        reg = re.compile(template).match(filename)
+        if reg is not None:
+            return reg.group()
+
+    def strip_tail(self, filename):
+        """
+        Функция для выделения из имени файла идентификатора платформы вместе с расширением.
+        :param filename:
+        :return:
+        """
+        template = r"_[a-zA-Z]*\.7z$"
+        # Возвращаем кусок между последним символом подчёркивания и расширением
+        try:
+            res = re.compile(template).search(filename).group()
+        except AttributeError:
+            res = ''
+        return res
+
     def find_newest(self, flist):
         """
         Функция для выделения из предложенного списка файлов одного, самого нового и подходящего под шаблон.
@@ -36,16 +61,10 @@ class Megaquery():
         """
         # Получаем список времён создания из всех файлов, в которых время указано в подходящем под шаблон формате:
         try:
-            times = {datetime.datetime.strptime(f[(len(self.prefix) + 1):-(len(self.platform) + 4)], '%d_%m_%y_%H_%M_%S'): f[-(len(self.platform) + 4):] for f in flist}
+            #for f in flist:
+            times = {datetime.datetime.strptime(f[(len(self.prefix) + 1):-len(self.strip_tail(f))], '%d_%m_%y_%H_%M_%S'): self.strip_tail(f) for f in flist}
         except ValueError:
             pass
-
-        #for f in flist:
-        #    try:
-        #        times.append((datetime.datetime.strptime(f[(len(self.prefix) + 1):-(len(self.platform) + 4)], '%d_%m_%y_%H_%M_%S'), f[-(len(self.platform) + 4):]))
-        #    except ValueError:
-        #        pass
-
         # Если ни одного подходящего файла не нашлось, т.е. длина списка нулевая, возвращаем единицу,
         if len(times) == 0:
             return (1,)
@@ -71,7 +90,7 @@ class Megaquery():
             raise MegasyncErrors("Unable to list MEGA files.")
         else:
             # Получаем из строки список файлов и сохраняем из него только те, которые подходят под шаблон:
-            files = [x for x in str(megacall, "utf-8").split() if x.startswith(self.prefix) and x.endswith(".7z")]
+            files = [x for x in str(megacall, "utf-8").split() if self.find_regular(x) is not None]
             return self.find_newest(files)
 
     def get(self, filename):
@@ -104,7 +123,7 @@ class FileOpers(Megaquery):
         Функция для получения самого свежего подходящего файла из локальных.
         :return:
         """
-        files = [x for x in os.listdir(".") if x.startswith(self.prefix) and x.endswith(".7z")]
+        files = [x for x in os.listdir(".") if self.find_regular(x) is not None]
         return self.find_newest(files)
 
     def zip(self):
@@ -112,11 +131,13 @@ class FileOpers(Megaquery):
         Функция для упаковки указанной директории в файл согласно шаблону.
         :return:
         """
+        if self.prefix not in os.listdir("."):
+            raise MegasyncErrors("Directory to pack not found.")
         filename = self.prefix + "_" + datetime.datetime.now().strftime('%d_%m_%y_%H_%M_%S') + "_" + self.platform + ".7z"
         try:
             subprocess.check_output("7z a -mhe=on -p{0} {1} {2}".format(self.archive_pass, filename, self.prefix), shell=True)
-        except subprocess.CalledProcessError:
-            raise MegasyncErrors("Unable to create archive.")
+        except subprocess.CalledProcessError as err:
+            raise MegasyncErrors("Unable to create archive: %s" % err)
         else:
             return filename
 
@@ -170,17 +191,16 @@ if __name__ == "__main__":
         exitfunc(err, 1)
     # Ищем самый новый файл на компьютере. Получаем в виде кортежа из кода ошибки (0/1) и собственно файла:
     local_file = mega.find_newest_local()
-    # Если на Меге не найдено ни одного подходящего файла:
     try:
         # Если указан ключ командной строки "p", то запаковать имеющуюся директорию и отправить на Мегу:
-        if sys.argv[1] == "p":
-            new_file = mega.zip()
-            mega.send(new_file)
-            exitfunc("File '%s' successfully uploaded." % new_file, 0)
+        if len(sys.argv) > 1:
+            if sys.argv[1] == "p":
+                new_file = mega.zip()
+                mega.send(new_file)
+                exitfunc("File '%s' successfully uploaded." % new_file, 0)
     except MegasyncErrors as err:
         exitfunc(err, 1)
-    except IndexError:
-        pass
+    # Если на Меге не найдено ни одного подходящего файла:
     if megafile[0] == 1:
         # Если к тому же и локального файла нет:
         if local_file[0] == 1:
@@ -224,8 +244,8 @@ if __name__ == "__main__":
             exitfunc("Nothing to do.", 0)
         # Если локально подходящий под шаблон файл найден, то нужно выяснить, старше он или моложе того, что на Меге:
         else:
-            mega_file_age = datetime.datetime.strptime(megafile[1][(len(conf.prefix) + 1):-(len(conf.platform_id) + 4)], '%d_%m_%y_%H_%M_%S')
-            local_file_age = datetime.datetime.strptime(local_file[1][(len(conf.prefix) + 1):-(len(conf.platform_id) + 4)], '%d_%m_%y_%H_%M_%S')
+            mega_file_age = datetime.datetime.strptime(megafile[1][(len(conf.prefix) + 1):-len(mega.strip_tail(megafile[1]))], '%d_%m_%y_%H_%M_%S')
+            local_file_age = datetime.datetime.strptime(local_file[1][(len(conf.prefix) + 1):-len(mega.strip_tail(local_file[1]))], '%d_%m_%y_%H_%M_%S')
             # Если локальный старше:
             if mega_file_age < local_file_age:
                 try:
