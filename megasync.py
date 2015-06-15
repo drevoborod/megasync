@@ -60,18 +60,24 @@ class Megaquery():
         :return:
         """
         # Получаем список времён создания из всех файлов, в которых время указано в подходящем под шаблон формате:
-        try:
-            #for f in flist:
-            times = {datetime.datetime.strptime(f[(len(self.prefix) + 1):-len(self.strip_tail(f))], '%d_%m_%y_%H_%M_%S'): self.strip_tail(f) for f in flist}
-        except ValueError:
-            pass
+        paramsdict = {}
+        for f in flist:
+            # Постфикс файла + расширение:
+            t = self.strip_tail(f)
+            # Строка со временем из имени файла:
+            param = f[(len(self.prefix) + 1):-len(t)]
+            try:
+                # Переводим строку со временем в формат datetime и добавляем, если не выпадает ошибка:
+                paramsdict[datetime.datetime.strptime(param, '%d_%m_%y_%H_%M_%S')] = (param, t)
+            except ValueError:
+                pass
         # Если ни одного подходящего файла не нашлось, т.е. длина списка нулевая, возвращаем единицу,
-        if len(times) == 0:
+        if len(paramsdict) == 0:
             return (1,)
         # иначе возвращаем 0 и самый новый файл:
         else:
-            newest = max(times.keys())
-            return (0, self.prefix + "_" + newest.strftime('%d_%m_%y_%H_%M_%S') + times[newest])
+            newest = max(paramsdict.keys())
+            return (0, self.prefix + "_" + paramsdict[newest][0] + paramsdict[newest][1])
 
 
     def find_newest_mega(self):
