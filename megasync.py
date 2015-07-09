@@ -88,7 +88,7 @@ class Megaquery():
         """
         try:
             temp = subprocess.check_output("megals -u {0} -p {1} --names --reload /Root".format(self.user, self.user_pass), shell=True)
-            temp_files = str(temp, "utf-8").split()
+            temp_files = temp.decode("utf-8").split()
             if self.prefix not in temp_files:
                 subprocess.check_output("megamkdir -u {0} -p {1} --reload /Root/{2}".format(self.user, self.user_pass, self.prefix), shell=True)
             megacall = subprocess.check_output("megals -u {0} -p {1} --names --reload /Root/{2}".format(self.user, self.user_pass, self.prefix), shell=True)
