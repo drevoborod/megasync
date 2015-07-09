@@ -87,7 +87,7 @@ class Megaquery():
         :return:
         """
         try:
-            temp = subprocess.check_output("megals -u {0} -p {1} --names --reload /Root".format(self.user, self.user_pass), shell=True)
+            temp = subprocess.check_output("megals -u {0} -p {1} --names --reload /Root".format(self.user, self.user_pass), shell=True, universal_newlines=True)
             #temp_files = []
             temp_files = [f.decode("utf-8") for f in temp.split(b"\r\n" if sys.platform == "win32" else b"\n")]
             #    f1 = f.decode("utf-8")
