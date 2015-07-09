@@ -14,7 +14,7 @@ class Configuration():
             raise MegasyncErrors("Unable to read configuration file.")
         for option in ("password", "username", "prefix", "platform_id"):
             try:
-                exec(compile("self.{0} = config['DEFAULT']['{0}']".format(option), {}, "exec"))
+                setattr(self, option, config['DEFAULT'][option])
             except KeyError:
                 raise MegasyncErrors("No option found: {0}".format(option))
 
@@ -83,24 +83,19 @@ class Megaquery():
     def find_newest_mega(self):
         """
         Функция для получения из указанной директории Меги имени новейшего файла.
-        Кроме того, если отсутствует указанная директория, она её создаёт.
+        Кроме того, если отсутствует указанная директория, функция её создаёт.
         :return:
         """
         try:
-            temp = subprocess.check_output("megals -u {0} -p {1} --names --reload /Root".format(self.user, self.user_pass), shell=True, universal_newlines=True)
-            #temp_files = []
-            temp_files = [f.decode("utf-8") for f in temp.split(b"\r\n" if sys.platform == "win32" else b"\n")]
-            #    f1 = f.decode("utf-8")
-             #   temp_files.append(f1)
-            if self.prefix not in temp_files:
+            files = subprocess.check_output("megals -u {0} -p {1} --names --reload /Root".format(self.user, self.user_pass), shell=True, universal_newlines=True).split("\n")
+            if self.prefix not in files:
                 subprocess.check_output("megamkdir -u {0} -p {1} --reload /Root/{2}".format(self.user, self.user_pass, self.prefix), shell=True)
-            megacall = subprocess.check_output("megals -u {0} -p {1} --names --reload /Root/{2}".format(self.user, self.user_pass, self.prefix), shell=True)
+            megacall = subprocess.check_output("megals -u {0} -p {1} --names --reload /Root/{2}".format(self.user, self.user_pass, self.prefix), shell=True, universal_newlines=True)
         except subprocess.CalledProcessError:
             raise MegasyncErrors("Unable to list MEGA files.")
         else:
             # Получаем из строки список файлов и сохраняем из него только те, которые подходят под шаблон:
-            files = filter(self.find_regular, str(megacall, "utf-8").split())
-            #files = [x for x in str(megacall, "utf-8").split() if self.find_regular(x) is not None]
+            files = filter(self.find_regular, megacall.split("\n"))
             return self.find_newest(files)
 
     def get(self, filename):
@@ -126,15 +121,13 @@ class Megaquery():
             raise MegasyncErrors("Unable to upload file to MEGA.")
 
 
-
 class FileOpers(Megaquery):
     def find_newest_local(self):
         """
         Функция для получения самого свежего подходящего файла из локальных.
         :return:
         """
-        files = filter(self.find_regular, os.listdir("."))
-        #files = [x for x in os.listdir(".") if self.find_regular(x) is not None]
+        files = filter(self.find_regular, os.listdir(os.curdir))
         return self.find_newest(files)
 
     def zip(self):
@@ -142,7 +135,7 @@ class FileOpers(Megaquery):
         Функция для упаковки указанной директории в файл согласно шаблону.
         :return:
         """
-        if self.prefix not in os.listdir("."):
+        if self.prefix not in os.listdir(os.curdir):
             raise MegasyncErrors("Directory to pack not found.")
         filename = self.prefix + "_" + datetime.datetime.now().strftime('%d_%m_%y_%H_%M_%S') + "_" + self.platform + ".7z"
         try:
@@ -158,14 +151,14 @@ class FileOpers(Megaquery):
         :return:
         """
         olddir = self.prefix + "_old"
-        if self.prefix in os.listdir("."):
+        if self.prefix in os.listdir(os.curdir):
             try:
                 shutil.rmtree(olddir, ignore_errors=False, onerror=del_rw)
             except FileNotFoundError:
                 pass
             try:
                 os.rename(self.prefix, olddir)
-            except Exception as err:
+            except Exception:
                 raise MegasyncErrors("Unable to rename directory.")
         try:
             subprocess.check_output("7z x -p{0} {1}".format(self.archive_pass, filename), shell=True)
@@ -217,7 +210,7 @@ if __name__ == "__main__":
         # Если к тому же и локального файла нет:
         if local_file[0] == 1:
             # То ищем директорию, которую можно запаковать:
-            if conf.prefix in os.listdir("."):
+            if conf.prefix in os.listdir(os.curdir):
                 try:
                     # Запаковываем нужный локальный файл:
                     zipped = mega.zip()
@@ -276,4 +269,4 @@ if __name__ == "__main__":
                 except MegasyncErrors as err:
                     exitfunc(err, 1)
                 else:
-                    exitfunc("File '%s' downloaded successfully."% megafile[1], 0)
+                    exitfunc("File '%s' downloaded successfully." % megafile[1], 0)
