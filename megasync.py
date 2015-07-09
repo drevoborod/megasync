@@ -161,7 +161,6 @@ class FileOpers(Megaquery):
         olddir = self.prefix + "_old"
         if self.prefix in os.listdir(os.curdir):
             try:
-                #del_dir(olddir)
                 shutil.rmtree(olddir, ignore_errors=False, onerror=del_rw)
             except FileNotFoundError:
                 pass
@@ -178,9 +177,6 @@ class FileOpers(Megaquery):
         except subprocess.CalledProcessError:
             raise MegasyncErrors("Unable to extract archive '%s'." % filename)
 
-def del_dir(dir):
-    "Функция для рекурсивного удаления директорий."
-    shutil.rmtree(dir, ignore_errors=False, onerror=del_rw)
 
 def del_rw(func, name, exc_info):
     """
