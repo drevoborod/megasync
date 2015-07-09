@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os, sys, configparser, datetime, subprocess, shutil, stat, re
+import os, sys, configparser, datetime, subprocess, shutil, stat, re, getpass
 
 class MegasyncErrors(Exception): pass
 
@@ -179,6 +179,7 @@ def del_rw(action, name, exc):
 
 def exitfunc(message, number):
     print("\n%s\n" % message)
+    input("Press Enter to finish.\n")
     sys.exit(number)
 
 
@@ -189,7 +190,7 @@ if __name__ == "__main__":
     except MegasyncErrors as err:
         exitfunc(err, 1)
     # Запрашиваем у юзера пароль от Меги:
-    mega_passwd = input("Enter MEGA password: ")
+    mega_passwd = getpass.getpass("Enter MEGA password: ")
     # Инициализируем класс для работы с Мегой:
     mega = FileOpers(conf.prefix, conf.username, mega_passwd, conf.password, conf.platform_id)
     try:
