@@ -6,17 +6,23 @@ import os, sys, configparser, datetime, subprocess, shutil, stat, re, getpass
 class MegasyncErrors(Exception): pass
 
 class Configuration():
-    def __init__(self):
+    def __init__(self, file, mandatory, optional):
         config = configparser.ConfigParser()
         try:
-            config.read("megasync.cfg")
+            config.read(file)
         except IOError:
             raise MegasyncErrors("Unable to read configuration file.")
-        for option in ("password", "username", "prefix", "platform_id"):
+        for option in mandatory:
             try:
                 setattr(self, option, config['DEFAULT'][option])
             except KeyError:
                 raise MegasyncErrors("No option found: {0}".format(option))
+        for option in optional:
+            try:
+                setattr(self, option, config['DEFAULT'][option])
+            except KeyError:
+                pass
+
 
 
 class Megaquery():
@@ -24,7 +30,7 @@ class Megaquery():
         self.prefix = file_prefix       # Часть, с которой начинается имя файла архива и директории.
         self.user = username            # Имя пользователя Меги.
         self.user_pass = user_passwd    # Пароль пользователя Меги
-        self.platform = platform_prefix     # Идентификатор платформы.
+        self.platform = "_" + platform_prefix     # Идентификатор платформы.
         self.archive_pass = archive_passwd  # Пароль, с которым будет создаваться (и распаковываться) архив.
 
     def find_regular(self, filename):
@@ -34,8 +40,7 @@ class Megaquery():
         :return:
         """
         template = self.prefix + r"_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,2}_[0-9]{1,2}_[a-zA-Z]*\.7z"
-        reg = re.compile(template).match(filename)
-        if reg is not None:
+        if re.compile(template).match(filename):
             return True
 
     def strip_tail(self, filename):
@@ -137,7 +142,7 @@ class FileOpers(Megaquery):
         """
         if self.prefix not in os.listdir(os.curdir):
             raise MegasyncErrors("Directory to pack not found.")
-        filename = self.prefix + "_" + datetime.datetime.now().strftime('%d_%m_%y_%H_%M_%S') + "_" + self.platform + ".7z"
+        filename = self.prefix + "_" + datetime.datetime.now().strftime('%d_%m_%y_%H_%M_%S') + self.platform + ".7z"
         try:
             subprocess.check_output("7z a -mhe=on -p{0} {1} {2}".format(self.archive_pass, filename, self.prefix), shell=True)
         except subprocess.CalledProcessError as err:
@@ -148,33 +153,52 @@ class FileOpers(Megaquery):
     def unzip(self, filename):
         """
         Функция для распаковки указанного файла и замены старой версии соответствующей директории.
+        Если подготовительный этап (удаление старой и переименование новой директории) фейлится,
+        то скачанный файл удаляется во избежание путаницы.
+        Если архив просто не удаётся распаковать, то файл не удаляется.
         :return:
         """
         olddir = self.prefix + "_old"
         if self.prefix in os.listdir(os.curdir):
             try:
+                #del_dir(olddir)
                 shutil.rmtree(olddir, ignore_errors=False, onerror=del_rw)
             except FileNotFoundError:
                 pass
+            except Exception as err:
+                os.remove(filename)
+                raise MegasyncErrors("Unable to remove old directory. %s." % err)
             try:
                 os.rename(self.prefix, olddir)
             except Exception:
+                os.remove(filename)
                 raise MegasyncErrors("Unable to rename directory.")
         try:
             subprocess.check_output("7z x -p{0} {1}".format(self.archive_pass, filename), shell=True)
         except subprocess.CalledProcessError:
-            raise MegasyncErrors("Unable to extract archive.")
+            raise MegasyncErrors("Unable to extract archive '%s'." % filename)
 
+def del_dir(dir):
+    "Функция для рекурсивного удаления директорий."
+    shutil.rmtree(dir, ignore_errors=False, onerror=del_rw)
 
 def del_rw(func, name, exc_info):
     """
-    Функция для удаления файлов только для чтения под Windows.
+    Функция для удаления файлов только для чтения под Windows и Unix.
     """
     try:
-        os.chmod(name, stat.S_IWRITE)
-        os.remove(name)
+        if sys.platform == "win32":
+            os.chmod(name, stat.S_IWRITE)
+            os.remove(name)
+        else:
+            # Даём юзеру права на запись к директории, содержащей неудаляемый файл:
+            os.chmod(os.path.split(name)[0], stat.S_IRWXU)
+            if os.path.isdir(name):
+                shutil.rmtree(name, ignore_errors=False, onerror=del_rw)
+            elif os.path.isfile(name):
+                os.remove(name)
     except Exception as err:
-        exitfunc(err, 1)
+        raise err
 
 def exitfunc(message, number):
     print("\n%s\n" % message)
@@ -183,15 +207,25 @@ def exitfunc(message, number):
 
 
 if __name__ == "__main__":
+
+    config_file = "megasync.cfg"
+    mandatory_settings = "username", "prefix"
+    optional_settings = "password", "platform_id"
+
     try:
         # Читаем настройки из файла:
-        conf = Configuration()
+        conf = Configuration(config_file, mandatory_settings, optional_settings)
     except MegasyncErrors as err:
         exitfunc(err, 1)
     # Запрашиваем у юзера пароль от Меги:
     mega_passwd = getpass.getpass("Enter MEGA password: ")
+    # Если нет пароля для архива, то тоже запрашиваем его у пользователя:
+    if hasattr(conf, "password"):
+        archive_password = conf.password
+    else:
+        archive_password = getpass.getpass("Enter password for an archive: ")
     # Инициализируем класс для работы с Мегой:
-    mega = FileOpers(conf.prefix, conf.username, mega_passwd, conf.password, conf.platform_id)
+    mega = FileOpers(conf.prefix, conf.username, mega_passwd, archive_password, conf.platform_id if hasattr(conf, "platform_id") else '')
     try:
         # Ищем самый свежий файл из Меги. Получаем кортеж из признака успеха (0|1) и собственно файла, если он есть:
         megafile = mega.find_newest_mega()
