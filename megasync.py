@@ -166,12 +166,15 @@ class FileOpers(Megaquery):
             raise MegasyncErrors("Unable to extract archive.")
 
 
-def del_rw(action, name, exc):
+def del_rw(func, name, exc_info):
     """
     Функция для удаления файлов только для чтения под Windows.
     """
-    os.chmod(name, stat.S_IWRITE)
-    os.remove(name)
+    try:
+        os.chmod(name, stat.S_IWRITE)
+        os.remove(name)
+    except Exception as err:
+        exitfunc(err, 1)
 
 def exitfunc(message, number):
     print("\n%s\n" % message)
