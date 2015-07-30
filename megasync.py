@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# ToDo: 1. Сделать проверку кодировки файла настроек.
 
 import os, sys, configparser, datetime, subprocess, shutil, stat, re, getpass
 
@@ -175,6 +176,7 @@ class FileOpers(Megaquery):
         try:
             subprocess.check_output("7z x -p{0} {1}".format(self.archive_pass, filename), shell=True)
         except subprocess.CalledProcessError:
+            os.remove(filename)
             raise MegasyncErrors("Unable to extract archive '%s'." % filename)
 
 
