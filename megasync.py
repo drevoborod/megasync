@@ -2,9 +2,40 @@
 # -*- coding: utf-8 -*-
 # ToDo: 1. Сделать проверку кодировки файла настроек.
 
-import os, sys, configparser, argparse, datetime, subprocess, shutil, stat, re, getpass
+import sys
+
+
+def exitfunc(message, number):
+    print("\n%s\n" % message)
+    if sys.version_info[0] == 2:
+        raw_input("Press Enter to finish.\n")   # For python2 compatibility
+    else:
+        input("Press Enter to finish.\n")
+    sys.exit(number)
+
+
+if sys.version_info[0] < 3:
+    exitfunc("Major version of Python interpreter should be at least equal to 3.\n"
+             "Your version is: %s" % sys.version, 1)
+else:
+    if sys.version_info[1] < 4:
+        exitfunc("Minor version of Python interpreter should be at least equal to 4\n"
+                 "Your version is: %s" % sys.version, 1)
+
+
+import os
+import configparser
+import argparse
+import datetime
+import subprocess
+import shutil
+import stat
+import re
+import getpass
+
 
 class MegasyncErrors(Exception): pass
+
 
 class Configuration():
     def __init__(self, file, mandatory, optional):
@@ -83,7 +114,6 @@ class Megaquery:
         else:
             newest = max(paramsdict.keys())
             return (0, self.prefix + "_" + paramsdict[newest][0] + paramsdict[newest][1])
-
 
     def find_newest_mega(self):
         """
@@ -203,11 +233,6 @@ def get_args():
     parser.add_argument("-c", "--commit", action="store_true", help="Commit changes and push them to Mega.")
     return parser.parse_args()
 
-
-def exitfunc(message, number):
-    print("\n%s\n" % message)
-    input("Press Enter to finish.\n")
-    sys.exit(number)
 
 
 if __name__ == "__main__":
