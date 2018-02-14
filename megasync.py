@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # ToDo: 1. Сделать проверку кодировки файла настроек.
 
-import os, sys, configparser, datetime, subprocess, shutil, stat, re, getpass
+import os, sys, configparser, argparse, datetime, subprocess, shutil, stat, re, getpass
 
 class MegasyncErrors(Exception): pass
 
@@ -25,8 +25,7 @@ class Configuration():
                 pass
 
 
-
-class Megaquery():
+class Megaquery:
     def __init__(self, file_prefix, username, user_passwd, archive_passwd, platform_prefix):
         self.prefix = file_prefix       # Часть, с которой начинается имя файла архива и директории.
         self.user = username            # Имя пользователя Меги.
@@ -198,6 +197,13 @@ def del_rw(func, name, exc_info):
     except Exception as err:
         raise err
 
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--commit", action="store_true", help="Commit changes and push them to Mega.")
+    return parser.parse_args()
+
+
 def exitfunc(message, number):
     print("\n%s\n" % message)
     input("Press Enter to finish.\n")
@@ -210,6 +216,8 @@ if __name__ == "__main__":
     mandatory_settings = "username", "prefix"
     optional_settings = "password", "platform_id"
 
+    # Параметры командной строки:
+    args = get_args()
     try:
         # Читаем настройки из файла:
         conf = Configuration(config_file, mandatory_settings, optional_settings)
@@ -231,15 +239,14 @@ if __name__ == "__main__":
         exitfunc(err, 1)
     # Ищем самый новый файл на компьютере. Получаем в виде кортежа из кода ошибки (0/1) и собственно файла:
     local_file = mega.find_newest_local()
-    try:
-        # Если указан ключ командной строки "p", то запаковать имеющуюся директорию и отправить на Мегу:
-        if len(sys.argv) > 1:
-            if sys.argv[1] == "p":
-                new_file = mega.zip()
-                mega.send(new_file)
-                exitfunc("File '%s' successfully uploaded." % new_file, 0)
-    except MegasyncErrors as err:
-        exitfunc(err, 1)
+    # Если указан ключ командной строки "-c", то запаковать имеющуюся директорию и отправить на Мегу:
+    if args.commit:
+        try:
+            new_file = mega.zip()
+            mega.send(new_file)
+            exitfunc("File '%s' successfully uploaded." % new_file, 0)
+        except MegasyncErrors as err:
+            exitfunc(err, 1)
     # Если на Меге не найдено ни одного подходящего файла:
     if megafile[0] == 1:
         # Если к тому же и локального файла нет:
